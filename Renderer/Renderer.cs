@@ -1,10 +1,15 @@
-﻿using Utilities;
+﻿using System.Text.RegularExpressions;
+using Utilities;
 
 namespace RenderEngine;
 
 public class Renderer : Configure
 {
-    public enum RendererType
+    #region Renderer Properties
+    /*****************************************************
+        MAIN PROPERTIES
+    *****************************************************/
+    private enum RendererType
     {
         SETTINGS,
         POINTER,
@@ -21,51 +26,79 @@ public class Renderer : Configure
         DETAILED_DEBUG,
         HELP,
     }
+    private readonly Logger Log = new("renderer");
     private ConsoleKeyInfo _keyInfo;
     private volatile RendererType renderSelection = RendererType.POINTER;
     private volatile RendererOverlay _overlay;
     private volatile bool _isExit = false;
     private volatile bool _isRefreshing = false;
     private volatile bool _isRefreshingPaused = true;
-    private volatile int _width;
-    private volatile int _height;
-    public readonly Logger Log = new("renderer");
 
+    private Screen Screen;
+    private ScreenInterfaceBuilder ScreenSettings;
+    private ScreenInterfaceBuilder Menu;
+    private readonly RendererTimings rendererTimings = new();
+    #endregion
 
-    // Initialize Renderer
+    #region Screen Builder
     public async Task Initialize()
     {
         Log.Info("Starting Console Game Engine...", true);
-        await BuildScreen();
-
-        Task screen = Task.Run(() => Refresh());
-        Task keyboard = Task.Run(() => KeyListener());
-
-        await Task.WhenAll(screen, keyboard);
-    }
-
-    private static void WritePixel(string input)
-    {
-        Console.WriteLine(input);
-    }
-
-    private async Task BuildScreen()
-    {
         Log.Info("> Building Screen", true);
 
-        Log.Info("    > Obtaining Initial Console Size", true);
-        _width = Console.WindowWidth;
-        _height = Console.WindowHeight;
-        Log.Verbose($"Initial Window Size: W:{_width} H:{_height}");
+        // Build GUI
+        ScreenSettings = new ScreenInterfaceBuilder()
+                    .AddText("Sample Text", 0, 0);
 
+        Menu = new ScreenInterfaceBuilder()
+                    .AddText("Sample Text 1", 0, 0)
+                    .AddButton("Sample Button", 0, 1, 1)
+                    .AddButton("Sample Button", 5, 2, 1)
+                    .AddButton("Sample Button", 8, 3, 1)
+                    .AddButton("Sample Button", 2, 4, 1);
+
+        // Build Screen
+        Screen = new Screen(Console.WindowWidth, Console.WindowHeight)
+                    .AddGUI("Settings", ScreenSettings.GetData())
+                    .AddGUI("MainMenu", Menu.GetData());
+
+        Log.Verbose($"Initial Window Size: W:{Screen.width} H:{Screen.height}");
         Log.Info("    > Initializing Renderer Methods", true);
-        // Renderer Methods Here
+        Screen.BuildFrame();
 
-        Log.Info("> Starting After 1 Second...", true);
+        // Wait for 1 second to let the person read (possibly be removed)
+        Log.Info("> Starting...", true);
         await Task.Run(() => Thread.Sleep(1000));
+
+
+        Screen.ClearFrame();
+        Task window = Task.Run(() => Refresh());
+        Task keyboard = Task.Run(() => KeyListener());
+
+        await Task.WhenAll(window, keyboard);
     }
 
-    private void RenderMethod(RendererType type)
+    private void RebuildScreen()
+    {
+        _isRefreshingPaused = true;
+        decimal baseWidth = (decimal)Console.WindowWidth / 2;
+        int baseHeight = Console.WindowHeight - 1;
+
+        if ((Screen.width != (int)Math.Floor(baseWidth)) || (Screen.height != baseHeight))
+        {
+            Screen = new Screen(Console.WindowWidth, Console.WindowHeight)
+                    .AddGUI("Settings", ScreenSettings.GetData())
+                    .AddGUI("MainMenu", Menu.GetData());
+            Screen.BuildFrame();
+            Log.Verbose($"Window Refreshed: W:{Screen.width} H:{Screen.height}");
+        }
+    }
+    #endregion
+
+    #region Console Renderer
+    // New Idea: Make some handles for other methods to access and modify the screen instead of going through a filter
+    //           to select a renderer method
+    private void RenderMethod(RendererType type, Screen screen)
     {
         switch (type)
         {
@@ -79,13 +112,13 @@ public class Renderer : Configure
             case RendererType.POINTER:
                 _isRefreshing = false;
                 Log.Debug("POINTER");
-                Console.WriteLine(RendererType.POINTER);
+                screen.RenderFrame();
                 break;
 
             case RendererType.DVD:
                 _isRefreshing = true;
                 Log.Debug("DVD");
-                Console.WriteLine(RendererType.DVD);
+                screen.RenderFrame();
                 break;
 
             case RendererType.LINES1:
@@ -125,56 +158,75 @@ public class Renderer : Configure
     {
         if (Properties == null) return;
 
-        await Task.Run(async () =>
+        while (true)
         {
-            _isRefreshingPaused = true;
-            _width = Console.WindowWidth;
-            _height = Console.WindowHeight;
-            Log.Verbose($"Window Refreshed: W:{_width} H:{_height}");
-
-            Console.Clear();
-            RenderMethod(renderSelection);
-
-            if (_isRefreshing)
+            await Task.Run(async () =>
             {
-                Thread.Sleep(1000 / Properties.Refresh);
-            }
-            else
+                // Check Screen Resize
+                RebuildScreen();
+                Screen.ClearFrame();
+                // Render
+                RenderMethod(renderSelection, Screen);
+
+                await CheckPause(); // await this or it'll lag like hell | refactor this command next time to properly use threading pause
+            });
+
+            if (_isExit) return;
+        }
+        // await Refresh(screen);
+    }
+
+    private async Task CheckPause()
+    {
+        if (Properties == null) return;
+
+        if (_isRefreshing)
+        {
+            Thread.Sleep(rendererTimings.FrameRate);
+        }
+        else
+        {
+            // Pause block: Pauses until _isRefreshingPaused is unlatched)
+            await Task.Run(() =>
             {
-                // Pause block: Pauses until _isRefreshingPaused is unlatched)
-                await Task.Run(() =>
+                while (_isRefreshingPaused)
                 {
-                    while (_isRefreshingPaused)
-                    {
-                        Thread.Sleep(Properties.Tick * 50);
-                    }
-                });
-            }
-        });
-
-        if (_isExit) return;
-        await Refresh();
+                    Thread.Sleep(rendererTimings.TickSpeed);
+                }
+            });
+        }
     }
 
     private async Task KeyListener()
     {
-        if (_isExit) return;
         if (Properties == null) return;
 
-        await Task.Run(async () =>
+        await Task.Run(() =>
         {
+            while (true)
+            {
+                if (renderSelection == RendererType.SETTINGS)
+                {
+                    Thread.Sleep(rendererTimings.TickSpeed);
+                    if (_isExit) return;
+                }
+                else
+                {
+                    ReadKey();
+                    _isRefreshingPaused = false;
+                    CheckKeys();
 
-            if (renderSelection == RendererType.SETTINGS) { Thread.Sleep(Properties.Tick * 50); await KeyListener(); if (_isExit) return; }
-
-            _keyInfo = Console.ReadKey(true);
-            _isRefreshingPaused = false;
-            CheckKeys();
-
-            Log.Verbose($"Key: {_keyInfo.Key}");
-            Thread.Sleep(Properties.Tick * 50);
+                    Log.Verbose($"Key: {_keyInfo.Key}");
+                    Thread.Sleep(rendererTimings.TickSpeed);
+                    if (_isExit) return;
+                }
+            }
         });
+    }
 
-        await KeyListener();
+    private void ReadKey()
+    {
+        _keyInfo = Console.ReadKey(true);
     }
 
     private void CheckKeys()
@@ -236,6 +288,7 @@ public class Renderer : Configure
                 break;
         }
     }
+    #endregion
 
     public void Settings()
     {
@@ -244,7 +297,7 @@ public class Renderer : Configure
 
         while (renderSelection == RendererType.SETTINGS)
         {
-            Console.Clear();
+            Screen.ClearFrame();
             Console.WriteLine(err);
             Console.WriteLine("[ Settings ]\n");
             Console.WriteLine("1  -  Exit Settings");
@@ -252,6 +305,7 @@ public class Renderer : Configure
             Console.WriteLine($"3  -  Change Background Tick Rate ({Properties.Tick})\n");
             Console.WriteLine($"4  -  Toggle Debug Logging ({Properties.IsDebug})");
             Console.WriteLine($"5  -  Toggle Verbose Logging ({Properties.IsVerbose})\n");
+            Console.WriteLine($"Console/Terminal Rendering Engine {Properties.Release} by SlamTheDragon\n");
             // reset var
             err = "";
 
@@ -265,18 +319,27 @@ public class Renderer : Configure
                     break;
 
                 case "2":
-                    Properties.Refresh = Int32.Parse(SetProperty("Enter New Target FPS:"));
+                    int test1 = Int32.Parse(SetProperty("Enter New Target FPS:"));
+                    if (test1 <= 0)
+                    {
+                        err = $"Error: Value cannot be set below 1. Set: ({test1})";
+                    }
+                    else
+                    {
+                        Properties.Refresh = test1;
+                    }
                     break;
 
                 case "3":
-                    
-                    int test = Int32.Parse(SetProperty("Enter New Tick Rate (Maximum 20):"));
-                    if (test > 20)
+
+                    int test2 = Int32.Parse(SetProperty("Enter New Tick Rate (Maximum 20):"));
+                    if (test2 > 20 || test2 < 1)
                     {
-                        err = "Value is too high.";
-                    } else
+                        err = $"Error: Value out of range. Set: ({test2})";
+                    }
+                    else
                     {
-                        Properties.Tick = test;
+                        Properties.Tick = test2;
                     }
                     break;
 
@@ -295,6 +358,7 @@ public class Renderer : Configure
                     break;
             }
         }
+        rendererTimings.Refresh();
     }
 
     public string SetProperty(string description)
@@ -303,15 +367,15 @@ public class Renderer : Configure
 
         while (renderSelection == RendererType.SETTINGS)
         {
-            Console.Clear();
-            if (isNull) { Console.WriteLine("Warning: Please enter something."); }
+            Screen.ClearFrame();
+            if (isNull) { Console.WriteLine("Warning: Please enter a valid value."); }
             else { Console.WriteLine(""); }
 
             Console.WriteLine($"{description} \n");
 
             var _ = Console.ReadLine();
 
-            if (_ == null || _ == "")
+            if (_ == null || _ == "" || !Regex.IsMatch(_, @"^\d+$"))
             {
                 isNull = true;
             }

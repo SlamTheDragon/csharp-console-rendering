@@ -94,26 +94,26 @@ public sealed class Logger : Configure
         DEBUG,
         VERBOSE
     }
-    public void Info(dynamic input, bool toConsole = false)
+    public void Info(dynamic input, bool toWindow = false)
     {
         LogFormatter(LogLevel.INFO, input.ToString());
-        if (toConsole) { Console.WriteLine(input); }
+        if (toWindow) { Console.WriteLine(input); }
     }
     public void Warn(dynamic input)
     {
         LogFormatter(LogLevel.WARN, input.ToString());
     }
-    public void Error(dynamic input, bool toConsole = false)
+    public void Error(dynamic input, bool toWindow = false)
     {
         LogFormatter(LogLevel.ERROR, input.ToString());
         string exclusiveLogMessage = $"[{LogLevel.ERROR}] [{LogName.ToUpper()}] {input}";
-        if (toConsole) { Console.WriteLine(exclusiveLogMessage); }
+        if (toWindow) { Console.WriteLine(exclusiveLogMessage); }
     }
-    public void Fatal(dynamic input, bool toConsole = false)
+    public void Fatal(dynamic input, bool toWindow = false)
     {
         LogFormatter(LogLevel.FATAL, input.ToString());
         string exclusiveLogMessage = $"[{LogLevel.FATAL}] [{LogName.ToUpper()}] {input}";
-        if (toConsole) { Console.WriteLine(exclusiveLogMessage); }
+        if (toWindow) { Console.WriteLine(exclusiveLogMessage); }
     }
     public void Debug(dynamic input)
     {

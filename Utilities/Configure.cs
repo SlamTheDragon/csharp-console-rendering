@@ -4,6 +4,8 @@ using System.Text.Json;
 
 namespace Utilities;
 
+// FIXME: Modify this class to only be called once, then make another class to be inherited as many times you want
+// see line 18 why
 public class Configure
 {
     public static Properties? Properties { get; private set; }
