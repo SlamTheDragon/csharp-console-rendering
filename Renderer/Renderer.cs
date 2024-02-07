@@ -35,12 +35,16 @@ public class Renderer : Configure
     private volatile bool _isRefreshingPaused = true;
 
     private Screen Screen;
+    private ScreenInterfaceBuilder Default;
     private ScreenInterfaceBuilder ScreenSettings;
     private ScreenInterfaceBuilder Menu;
     private readonly RendererTimings rendererTimings = new();
     #endregion
+  
 
     #region Screen Builder
+
+    // convert to constructor?
     public async Task Initialize()
     {
         Log.Info("Starting Console Game Engine...", true);
@@ -50,6 +54,12 @@ public class Renderer : Configure
         ScreenSettings = new ScreenInterfaceBuilder()
                     .AddText("Sample Text", 0, 0);
 
+        Default = new ScreenInterfaceBuilder()
+                    .AddText("Press ESC to Exit. Press F2 to Configure.", 0, 0)
+                    .AddText("This is a custom textbox", 20, 5)
+                    .AddText("I can now position texts everywhere", 12, 22)
+                    .AddText("overflowing textbox i supposed", 45, 7);
+
         Menu = new ScreenInterfaceBuilder()
                     .AddText("Sample Text 1", 0, 0)
                     .AddButton("Sample Button", 0, 1, 1)
@@ -58,38 +68,44 @@ public class Renderer : Configure
                     .AddButton("Sample Button", 2, 4, 1);
 
         // Build Screen
-        Screen = new Screen(Console.WindowWidth, Console.WindowHeight)
-                    .AddGUI("Settings", ScreenSettings.GetData())
-                    .AddGUI("MainMenu", Menu.GetData());
+        await BuildScreen();
 
         Log.Verbose($"Initial Window Size: W:{Screen.width} H:{Screen.height}");
         Log.Info("    > Initializing Renderer Methods", true);
-        Screen.BuildFrame();
 
-        // Wait for 1 second to let the person read (possibly be removed)
+        // ...
+
         Log.Info("> Starting...", true);
-        await Task.Run(() => Thread.Sleep(1000));
 
+        await Task.Run(() => Thread.Sleep(1000));
 
         Screen.ClearFrame();
         Task window = Task.Run(() => Refresh());
         Task keyboard = Task.Run(() => KeyListener());
+        Log.Info("> Ready...", true);
 
         await Task.WhenAll(window, keyboard);
+    }
+
+    private async Task BuildScreen()
+    {
+        Screen = new Screen(Console.WindowWidth, Console.WindowHeight)
+                            .AddGUI("Default", Default.GetData())
+                            .AddGUI("Settings", ScreenSettings.GetData())
+                            .AddGUI("MainMenu", Menu.GetData())
+                            .AddLogger(Log);
+        await Screen.BuildFrame();
     }
 
     private void RebuildScreen()
     {
         _isRefreshingPaused = true;
-        decimal baseWidth = (decimal)Console.WindowWidth / 2;
+        double baseWidth = (double)Console.WindowWidth / 2;
         int baseHeight = Console.WindowHeight - 1;
 
         if ((Screen.width != (int)Math.Floor(baseWidth)) || (Screen.height != baseHeight))
         {
-            Screen = new Screen(Console.WindowWidth, Console.WindowHeight)
-                    .AddGUI("Settings", ScreenSettings.GetData())
-                    .AddGUI("MainMenu", Menu.GetData());
-            Screen.BuildFrame();
+            BuildScreen();
             Log.Verbose($"Window Refreshed: W:{Screen.width} H:{Screen.height}");
         }
     }
@@ -106,6 +122,8 @@ public class Renderer : Configure
                 _isRefreshing = false;
 
                 Log.Debug("SETTINGS");
+                // screen.BuildFrame("Settings");
+                screen.RenderFrame();
                 Settings();
                 break;
 
@@ -309,7 +327,7 @@ public class Renderer : Configure
             // reset var
             err = "";
 
-            string input = Console.ReadLine();
+            string? input = Console.ReadLine();
 
             switch (input)
             {
@@ -386,13 +404,5 @@ public class Renderer : Configure
         }
 
         return "";
-    }
-
-    private async Task HandleError(Exception e)
-    {
-        await Task.Run(() =>
-        {
-            Log.Warn(e);
-        });
     }
 }

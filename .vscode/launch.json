@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "[Integrated] .NET Core Launch",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/win-x64/csharp-console-rendering.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "requireExactSource": true
+        },
+        {
+            "name": "[External] .NET Core Launch",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/win-x64/csharp-console-rendering.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "externalTerminal",
+            "requireExactSource": true
+        }
+    ]
+}

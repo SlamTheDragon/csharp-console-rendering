@@ -1,4 +1,4 @@
-﻿using System.Text;
+﻿using System.Text.RegularExpressions;
 
 namespace Utilities;
 
@@ -49,14 +49,23 @@ public sealed class Logger : Configure
         }
 
         // update oldLogFolder to enable file renaming
-        int dupe = 0;
+        short dupe = 0;
         string modifiedOldLogs;
         string modifiedOldLogs1;
 
         bool isCreating = true;
+        Exception? exception = null;
+
 
         while (isCreating)
         {
+            // if File not found :: vscode debugging temporary fix :: "File.Copy() base directory points at the project location, not at the executable location"
+            if (exception == null) {; }
+            else
+            {
+                if (Regex.IsMatch(exception.Message, @"\bCould not find file\b")) break;
+            }
+
             try
             {
                 if (dupe == 0)
@@ -76,7 +85,7 @@ public sealed class Logger : Configure
             }
             catch (Exception e)
             {
-                _ = e;
+                exception = e;
             }
             dupe++;
         }

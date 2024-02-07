@@ -1,4 +1,5 @@
 using System.Text;
+using Utilities;
 
 namespace RenderEngine;
 
@@ -14,6 +15,7 @@ internal class Screen
     private char[,] GUIMappings { get; set; }
     private string[,] RenderedFrame { get; set; }
     private Dictionary<string, List<List<object>>> ScreenGUI { get; set; } = [];
+    private Logger Log;
 
 
     /*****************************************************
@@ -46,7 +48,7 @@ internal class Screen
             for (int j = 0; j < w; j++)
             {
                 // initiate initial float values
-                GUIMappings[i, j] = ' ';
+                GUIMappings[i, j] = '\u00A0';
             }
         }
     }
@@ -68,20 +70,36 @@ internal class Screen
         return this;
     }
 
+    public Screen AddLogger(Logger logger)
+    {
+        Log = logger;
+        return this;
+    }
+
     /*****************************************************
         METHODS
     *****************************************************/
-    public void BuildFrame(string? SelectGUI = "MainMenu")
+    // TODO: Double check this method if we need to rebuild the screen every time the GUI switches
+    public async Task BuildFrame(string? SelectGUI = "Default")
     {
-        InterfaceDecoder(SelectGUI);
-
-        // col | height
-        for (int i = 0; i < height; i++)
+        try
         {
-            // row | width
-            for (int j = 0; j < width; j++)
+            InterfaceDecoder(SelectGUI);
+        }
+        catch (Exception e)
+        {
+            await HandleError(e);
+        }
+        finally
+        {
+            // col | height
+            for (int i = 0; i < height; i++)
             {
-                RenderedFrame[i, j] = GetPixelBrightness(ScreenMappings[i, j]) + InterfaceRenderer(j*2, i) + "\x1b[0m";
+                // row | width
+                for (int j = 0; j < width; j++)
+                {
+                    RenderedFrame[i, j] = GetPixelBrightness(ScreenMappings[i, j]) + InterfaceRenderer(j * 2, i) + "\x1b[0m";
+                }
             }
         }
     }
@@ -129,7 +147,8 @@ internal class Screen
         int x = coordinates[0];
         int y = coordinates[1];
 
-        for (int i = 0; x < text.Length; i++, x++)
+        // add try catch here
+        for (int i = 0; i < text.Length; i++, x++)
         {
             GUIMappings[y, x] = text[i];
         }
@@ -138,7 +157,7 @@ internal class Screen
         x -= text.Length;
 
         if (border == 0) return;
-        for (int i = 0; x < (int)Math.Floor((decimal)text.Length/2); i++, x++)
+        for (int i = 0; i < (int)Math.Floor((decimal)text.Length/2); i++, x++)
         {
             ScreenMappings[y, x] = 0.50f;
         }
@@ -185,6 +204,15 @@ internal class Screen
 
         // Might not be supported on other console windows:
         Console.Write("\x1b[3J");
+    }
+
+    private async Task HandleError(Exception e)
+    {
+        if (Log == null) return;
+        await Task.Run(() =>
+        {
+            Log.Warn(e);
+        });
     }
 }
 

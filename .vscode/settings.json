@@ -1,0 +1,7 @@
+{
+    "search.actionsPosition": "right",
+    "workbench.editor.editorActionsLocation": "default",
+    "workbench.editor.tabSizing": "shrink",
+    "workbench.editor.showTabs": "multiple",
+    "workbench.editor.splitInGroupLayout": "horizontal"
+}
