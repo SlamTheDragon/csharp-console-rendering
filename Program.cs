@@ -1,69 +1,43 @@
 ﻿using Utilities;
+using Utilities.Data;
 using RenderEngine;
 
 namespace Program;
-
-internal class Program : Configure
+internal static class Program
 {
-    private readonly Logger Log = new("Main");
-    private readonly Renderer renderer = new();
+    private static readonly LogStreamer LogStreamer = new();
+    private static Logger? Log;
+    private static SharedData? Data;
 
     public static async Task Main(string[] args)
     {
-        Program program = new();
+        Data = new();
+        Log = new("main", LogStreamer, Data);
+        Logger LogRenderer = new("renderer", LogStreamer, Data);
 
-        // Check if command-line arguments are provided
-        if (args.Length > 0)
-        {
-            program.Welcome();
+        RendererTimings Timings = new(Data);
+        Renderer Renderer = new Renderer()
+            .AddLogger(LogRenderer)
+            .AddData(Data)
+            .AddTimingsManager(Timings);
 
-            for (int i = 0; i < args.Length; i++)
-            {
-                switch (args[i])
-                {
-                    case "help":
-                        Console.WriteLine("Define args help here. Press enter to exit");
-                        Console.ReadLine();
-                        program.Cleanup(0);
-                        return;
-                    default:
-                        break;
-                }
-            }
-            await program.Start();
-        }
-        else
-        {
-            program.Welcome();
-            await program.Start();
-        }
-
-        program.Cleanup(0);
-    }
-
-    private async Task Start()
-    {
-        await renderer.Initialize();
-    }
-
-    // move this somewhere else
-    private void Welcome()
-    {
-        if (Properties == null) return;
         Log.Info("[==========================================]");
         Log.Info("  Welcome to Slam's Fun Console Rendering");
-        Log.Info($"               Project {Properties.Release}");
+        Log.Info($"               Project {Data.Properties.Release}");
         Log.Info("[==========================================]");
+
+        await Renderer.Initialize();
+
+        Cleanup(0);
     }
 
-    public void Cleanup(int exitCode)
+    public static void Cleanup(int exitCode)
     {
         Console.Clear();
+        Log.Info($"Exiting Application with exit code: {exitCode}", true);
 
-        Log.Info("Exiting Application...", true);
-
-        Logger.Cleanup();
-        Save();
+        LogStreamer.Cleanup();
+        Data.Save();
 
         Environment.Exit(exitCode);
     }

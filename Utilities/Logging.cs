@@ -1,173 +1,181 @@
-﻿using System.Text.RegularExpressions;
+﻿using Utilities.Data;
 
 namespace Utilities;
+public enum LogLevel
+{
+    INFO,
+    WARN,
+    ERROR,
+    FATAL,
+    DEBUG,
+    VERBOSE
+}
 
-public sealed class Logger : Configure
+/// <summary>
+/// Custom Logging Class
+/// </summary>
+public sealed class Logger
 {
     #region Properties
     private string LogName { get; set; }
-
     private readonly bool _verbose;
     private readonly bool _debug;
-    private readonly string logPath = string.Empty;
-    private readonly bool isLogFileCreated = false;
-
+    private readonly LogStreamer LogStreamer;
+    private readonly SharedData Data;
     #endregion
-    #region Constructor
 
-    public Logger(string logName)
+    #region Constructor
+    public Logger(string logName, LogStreamer streamWriter, SharedData data)
     {
+        Data = data;
         LogName = logName;
 
-        if (isLogFileCreated) return;
-        // FIXME: monitor this in the future, just in case the properties are changed (since you moved the if-guard statement higher than this)
-        if (Properties != null)
-        {
-            _verbose = Properties.IsVerbose;
-            _debug = Properties.IsDebug;
-        }
+        _verbose = Data.Properties.IsVerbose;
+        _debug = Data.Properties.IsDebug;
 
-        // Delete the latest.log if it exist, otherwise just store the directory
-        string logDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        logPath = Path.Combine(logDirectory, "latest.log");
-
-        if (!Directory.Exists(logPath))
-        {
-            File.Delete(logPath);
-        }
-
-        isLogFileCreated = true;
+        LogStreamer = streamWriter;
     }
-
-    public static void Cleanup()
-    {
-        // create the logs folder for archival purposes if it doesn't exist
-        string oldLogs = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
-        if (!Directory.Exists(oldLogs))
-        {
-            Directory.CreateDirectory(oldLogs);
-        }
-
-        // update oldLogFolder to enable file renaming
-        short dupe = 0;
-        string modifiedOldLogs;
-        string modifiedOldLogs1;
-
-        bool isCreating = true;
-        Exception? exception = null;
-
-
-        while (isCreating)
-        {
-            // if File not found :: vscode debugging temporary fix :: "File.Copy() base directory points at the project location, not at the executable location"
-            if (exception == null) {; }
-            else
-            {
-                if (Regex.IsMatch(exception.Message, @"\bCould not find file\b")) break;
-            }
-
-            try
-            {
-                if (dupe == 0)
-                {
-                    string fileName = $"{DateTime.Now:MM-dd-yyyy}.log";
-                    modifiedOldLogs = Path.Combine(oldLogs, fileName);
-                    File.Copy("latest.log", modifiedOldLogs);
-                    isCreating = false;
-                }
-                else
-                {
-                    string fileNameDuped = $"{DateTime.Now:MM-dd-yyyy}_{dupe}.log";
-                    modifiedOldLogs1 = Path.Combine(oldLogs, fileNameDuped);
-                    File.Copy("latest.log", modifiedOldLogs1);
-                    isCreating = false;
-                }
-            }
-            catch (Exception e)
-            {
-                exception = e;
-            }
-            dupe++;
-        }
-    }
-
     #endregion
-    #region Logging Methods
 
-    private enum LogLevel
-    {
-        INFO,
-        WARN,
-        ERROR,
-        FATAL,
-        DEBUG,
-        VERBOSE
-    }
+    #region Logging Methods
+    /// <summary>
+    /// Log an INFO message
+    /// </summary>
+    /// <param name="input"></param>
+    /// <param name="toWindow"></param>
     public void Info(dynamic input, bool toWindow = false)
     {
-        LogFormatter(LogLevel.INFO, input.ToString());
+        LogStreamer.LogFormatter(LogLevel.INFO, input.ToString(), LogName);
         if (toWindow) { Console.WriteLine(input); }
     }
+    /// <summary>
+    /// Log a WARN message
+    /// </summary>
+    /// <param name="input"></param>
     public void Warn(dynamic input)
     {
-        LogFormatter(LogLevel.WARN, input.ToString());
+        LogStreamer.LogFormatter(LogLevel.WARN, input.ToString(), LogName);
     }
+    /// <summary>
+    /// Log an ERROR message
+    /// </summary>
+    /// <param name="input"></param>
+    /// <param name="toWindow"></param>
     public void Error(dynamic input, bool toWindow = false)
     {
-        LogFormatter(LogLevel.ERROR, input.ToString());
+        LogStreamer.LogFormatter(LogLevel.ERROR, input.ToString(), LogName);
         string exclusiveLogMessage = $"[{LogLevel.ERROR}] [{LogName.ToUpper()}] {input}";
         if (toWindow) { Console.WriteLine(exclusiveLogMessage); }
     }
+    /// <summary>
+    /// Log a FATAL message
+    /// </summary>
+    /// <param name="input"></param>
+    /// <param name="toWindow"></param>
     public void Fatal(dynamic input, bool toWindow = false)
     {
-        LogFormatter(LogLevel.FATAL, input.ToString());
+        LogStreamer.LogFormatter(LogLevel.FATAL, input.ToString(), LogName);
         string exclusiveLogMessage = $"[{LogLevel.FATAL}] [{LogName.ToUpper()}] {input}";
         if (toWindow) { Console.WriteLine(exclusiveLogMessage); }
     }
+    /// <summary>
+    /// Log a DEBUG message
+    /// </summary>
+    /// <param name="input"></param>
     public void Debug(dynamic input)
     {
         if (!_debug) return;
-        LogFormatter(LogLevel.DEBUG, input.ToString());
+        LogStreamer.LogFormatter(LogLevel.DEBUG, input.ToString(), LogName);
     }
+    /// <summary>
+    /// Log a VERBOSE message
+    /// </summary>
+    /// <param name="input"></param>
     public void Verbose(dynamic input)
     {
         if (!_verbose) return;
-        LogFormatter(LogLevel.VERBOSE, input.ToString());
+        LogStreamer.LogFormatter(LogLevel.VERBOSE, input.ToString(), LogName);
+    }
+    #endregion
+}
+
+public sealed class LogStreamer
+{
+    private readonly bool isLogFileCreated = false;
+    private readonly string logPath;
+
+    public LogStreamer()
+    {
+        // Delete the latest.log if it exist, otherwise just store the directory
+        logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "latest.log");
+        if (!Directory.Exists(logPath)) File.Delete(logPath);
+        isLogFileCreated = true;
     }
 
-    #endregion
-    #region File Streaming
-
-    private void LogFormatter(LogLevel level, string input)
+    /// <summary>
+    /// Log Format Builder for file output
+    /// </summary>
+    /// <param name="level"></param>
+    /// <param name="input"></param>
+    /// <param name="LogName"></param>
+    public void LogFormatter(LogLevel level, string input, string LogName)
     {
         string logMessage = $"{DateTime.Now:HH:mm:ss} [{char.ToUpper(LogName[0]) + LogName[1..].ToLower()}/{level}]: {input}";
         WriteLogToFile(logMessage);
     }
-    private void WriteLogToFile(string logMessage)
+    /// <summary>
+    /// Write the log message to the file
+    /// </summary>
+    /// <param name="logMessage"></param>
+    public void WriteLogToFile(string logMessage)
     {
         try
         {
             if (logPath != null && isLogFileCreated)
             {
                 // Writing the log message to the file
-
                 using StreamWriter writer = new(logPath, true);
-                // ->
-                // byte[] contentBytes = Encoding.UTF8.GetBytes();
                 writer.WriteLine(logMessage);
             }
         }
         catch (Exception e)
-        {
-            HandleError(e);
-        }
+        { _ = e; }
     }
 
-    #endregion
-
-    private void HandleError(Exception e)
+    public void Cleanup()
     {
-        Logger Log = new("Log Handler");
-        Log.Error(e, true);
+        // create the logs folder for archival purposes if it doesn't exist
+        string oldLogs = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+        if (!Directory.Exists(oldLogs))
+        { Directory.CreateDirectory(oldLogs); }
+
+        short dupe = 0;
+        bool isCreating = true;
+
+        while (isCreating)
+        {
+            try
+            {
+                if (dupe == 0)
+                {
+                    string fileName = $"{DateTime.Now:MM-dd-yyyy}.log";
+                    string modifiedOldLogs = Path.Combine(oldLogs, fileName);
+                    File.Copy(logPath, modifiedOldLogs);
+                    isCreating = false;
+                }
+                else
+                {
+                    string fileNameDuped = $"{DateTime.Now:MM-dd-yyyy}_{dupe}.log";
+                    string modifiedOldLogs1 = Path.Combine(oldLogs, fileNameDuped);
+                    File.Copy(logPath, modifiedOldLogs1);
+                    isCreating = false;
+                }
+            }
+            catch (Exception e)
+            {
+                _ = e;
+            }
+            dupe++;
+        }
     }
 }

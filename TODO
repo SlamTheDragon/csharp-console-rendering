@@ -1,0 +1,49 @@
+# TODO
+
+## TODO's
+- [!!] Define and implement interactive components in Screen class (!!PARTIAL)
+  - [IMPORTANT] Explanation:
+  - Each list contains a [GUI_Component], some of them are [interactive]
+  - [Interactive_Components] have unique [properties], their [properties] should be also set to a different [list] that will be used for [action_filtering]
+  - In order to create interaction to those components, an [outside_request] should be triggered granted to execute a defined action similarly implemented on how the keybinding works.
+    - up/down/left/right/space/enter/etc...
+  - A pointer will also be initiated to increment and decrement so that we can select functions that are stored in the list. (NOTE: The pointer is expected to reset itself whenever the screen resizes. This is a minor inconvenience and we dont need to address this unless the perfectionism attacks)
+  - There are certain flags that needs to be used to properly indicate the use of the component
+  - [TODO] For now, try implementing the navigation methods. 
+    - Possible outline:
+    - (1) A list to define the methods
+    - (2) An index to be used as a list pointer
+    - methods to modify the pointer
+    - methods to execute the function in the list
+  - [WHAT_WE_HAVE]:
+    - (1) A list of functions that are extracted from the 3D list
+    - (2) An index that points to the list of functions
+    - A 3D list which stores all kinds of components
+    - A 2nd list which stores the state of a certain component whether if it is an interactive menu or not with it's name
+    - A string containing the current overlay that is being rendered
+
+## FIXME's
+- [ ] Actually redefine the rendering flow. This is to account proper handling/rebuilding of GUI's
+
+## Optimization
+- [X] Define Screen.cs's frame rendering flow across rendering methods.
+- [ ] Possibly integrate a rendering method in Screen.BuildFrame().
+
+## Refactoring
+- [X] Fix Program.cs
+- [X] Export all Configure.cs data to a higher class to not instance and trigger the constructor multiple times.
+  - [X] Saving and Loading data is now a bit of impossible due to how the higher class is constructed: "new values are not being propagated all throughout the instances"
+  - [!!] Now properly implement the renderer methods to accurately display information.
+
+- [X] Separate the file streaming from the Logging.cs's constructor. Share one streamwriter logging instance across classes.
+- [!!] Replace/Remove RendererType enum.
+    - [/] Refactor rendering methods hierarchy.
+- [!!] Fix Renderer.cs's threading to properly use System.Threading (also to allow us to watch volatile properties without worrying about thread safety) 
+- [x] Properly implement Renderer.cs constructor.
+- [ ] Merge methods that can be merged (!PARTIAL)
+
+## Features
+- [ ] We could move the keybinding system to Screen.cs or into a new class. (Review methods).
+- [ ] Add more UI components.
+- [ ] Limit process on a given amount of CPU cores
+- [ ] *possibly find a way to use the GPU?*

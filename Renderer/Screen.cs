@@ -1,10 +1,10 @@
-using System.Text;
 using Utilities;
+using System.Text;
 
 namespace RenderEngine;
-
 internal class Screen
 {
+    #region Properties
     /*****************************************************
         SCREEN PROPERTIES
     *****************************************************/
@@ -14,10 +14,15 @@ internal class Screen
     public float[,] ScreenMappings { get; set; }
     private char[,] GUIMappings { get; set; }
     private string[,] RenderedFrame { get; set; }
-    private Dictionary<string, List<List<object>>> ScreenGUI { get; set; } = [];
-    private Logger Log;
+    private Dictionary<string, List<List<object>>> ScreenOverlayUI { get; set; } = [];
+    private Dictionary<string, bool> OverlayLockables { get; set; } = [];
+    private string SelectedOverlay { get; set; }
+    private List<Action> ActionStore { get; set; } = [];
+    private byte ActionIndex { get; set; }
+    private Logger Log { get; set; }
+    #endregion
 
-
+    #region Constructor
     /*****************************************************
         CONSTRUCTOR
     *****************************************************/
@@ -34,25 +39,15 @@ internal class Screen
         GUIMappings = new char[height, w]; // since we're dealing with texts here
         RenderedFrame = new string[height, width];
 
+        // how to combine these two for loops lol
         for (int i = 0; i < height; i++)
         {
             for (int j = 0; j < width; j++)
-            {
-                // initiate initial float values
-                ScreenMappings[i, j] = Step();
-            }
-        }
-
-        for (int i = 0; i < height; i++)
-        {
-            for (int j = 0; j < w; j++)
-            {
-                // initiate initial float values
-                GUIMappings[i, j] = '\u00A0';
-            }
+            { ScreenMappings[i, j] = Step(); }
         }
     }
 
+    // FIXME: Temporary
     private float silliness = 0.001f;
     private float Step()
     {
@@ -64,9 +59,10 @@ internal class Screen
         return silliness;
     }
 
-    public Screen AddGUI(string GUIName, List<List<object>> lists)
+    public Screen AddOverlay(string Overlay, List<List<object>> lists, bool isLockable = false)
     {
-        ScreenGUI.Add(GUIName, new List<List<object>>(lists));
+        ScreenOverlayUI.Add(Overlay, new List<List<object>>(lists));
+        OverlayLockables.Add(Overlay, isLockable);
         return this;
     }
 
@@ -75,35 +71,61 @@ internal class Screen
         Log = logger;
         return this;
     }
+    #endregion
 
     /*****************************************************
         METHODS
     *****************************************************/
-    // TODO: Double check this method if we need to rebuild the screen every time the GUI switches
-    public async Task BuildFrame(string? SelectGUI = "Default")
+
+    /// <summary>
+    /// Screen Frame Builder
+    /// </summary>
+    /// <param name="SelectOverlay"></param>
+    public async Task BuildFrame(string SelectOverlay)
     {
-        try
+        SelectedOverlay = SelectOverlay;
+        ActionIndex = 0;
+
+        // clear gui - the cheap solution but unoptimized
+        for (int i = 0; i < height; i++)
         {
-            InterfaceDecoder(SelectGUI);
+            for (int j = 0; j < (width * 2); j++)
+            { GUIMappings[i, j] = '\u00A0'; }
         }
-        catch (Exception e)
+
+        await InterfaceDecoder(SelectOverlay);
+
+        // TODO: await - Call a method to calculate results for ScreenMappings (not unless it's still not done from doing)
+
+        // col | height
+        for (int i = 0; i < height; i++)
         {
-            await HandleError(e);
-        }
-        finally
-        {
-            // col | height
-            for (int i = 0; i < height; i++)
+            // row | width
+            for (int j = 0; j < width; j++)
             {
-                // row | width
-                for (int j = 0; j < width; j++)
-                {
-                    RenderedFrame[i, j] = GetPixelBrightness(ScreenMappings[i, j]) + InterfaceRenderer(j * 2, i) + "\x1b[0m";
-                }
+                RenderedFrame[i, j] =
+                GetPixelBrightness(ScreenMappings[i, j])
+                 + InterfaceRenderer(j * 2, i)
+                 + "\x1b[0m";
             }
         }
     }
 
+    private static string GetPixelBrightness(float f)
+    {
+        byte step = (byte)Math.Floor(f / 1.0 * 255);
+        byte textColor = step > 128 ? (byte)30 : (byte)97; // Invert text color based on brightness
+
+        string brightness = $"\x1b[48;2;{step};{step};{step}m\x1b[{textColor}m";
+        return brightness;
+    }
+
+    /// <summary>
+    /// Insert UI Components to the Screen
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
     private string InterfaceRenderer(int x, int y)
     {
         char a = GUIMappings[y, x];
@@ -111,70 +133,121 @@ internal class Screen
         return $"{a}{b}";
     }
 
-    private void InterfaceDecoder(string? SelectGUI)
+    /// <summary>
+    /// Decode the Interface from the ScreenOverlayUI
+    /// </summary>
+    /// <param name="SelectOverlay"></param>
+    /// <returns></returns>
+    private async Task InterfaceDecoder(string SelectOverlay)
     {
-        if (SelectGUI == null) return;
-
-        char[] text = [];
-        int[] coordinates = [0, 0];
+        char[] text;
+        int[] coords;
         int border = 0;
 
-        foreach (var row in ScreenGUI[SelectGUI])
+        foreach (var row in ScreenOverlayUI[SelectOverlay])
         {
+            // Assign
             switch (row[0])
             {
                 case InterfaceTypes.TEXT:
                     text = ((string)row[1]).ToCharArray();
-                    coordinates = (int[])row[2];
+                    coords = (int[])row[2];
+
+                    await InterfaceBuilder(text, coords, border);
+                    break;
+
+                case InterfaceTypes.DYNAMIC_TEXT:
+                    break;
+
+                case InterfaceTypes.MAGNETIC_TEXT:
                     break;
 
                 case InterfaceTypes.BUTTON:
                     text = ((string)row[1]).ToCharArray();
-                    coordinates = (int[])row[2];
-                    border = (int)row[3];
+                    coords = (int[])row[2];
+
+                    ActionStore.Add((Action)row[3]);
+
+                    border = (int)row[4];
+
+                    await InterfaceBuilder(text, coords, border);
                     break;
 
-                default:
+                case InterfaceTypes.SLIDER:
+                    break;
+
+                case InterfaceTypes.TEXT_INPUT:
                     break;
             }
-
-            InterfaceBuilder(text, coordinates, border);
         }
     }
 
-    private void InterfaceBuilder(char[] text, int[] coordinates, int? border = 0)
+    /// <summary>
+    /// Sub method for InterfaceDecoder
+    /// </summary>
+    /// <param name="text"></param>
+    /// <param name="coords"></param>
+    /// <param name="border"></param>
+    /// <returns></returns>
+    /// <exception cref="IndexOutOfRangeException"></exception>
+    private async Task InterfaceBuilder(char[] text, int[] coords, int border = 0)
     {
-        int x = coordinates[0];
-        int y = coordinates[1];
+        int x = coords[0];
+        int y = coords[1];
+        int targetX = border >= 2 ? x + (border - 1) * 2 : x;
+        int targetY = border >= 2 ? y + (border - 1) : y;
+        bool isOutOfBounds = false;
 
-        // add try catch here
-        for (int i = 0; i < text.Length; i++, x++)
+        if (y > height) return;
+
+        for (int i = 0; i < text.Length; i++, targetX++)
         {
-            GUIMappings[y, x] = text[i];
+            if (targetY < GUIMappings.GetLength(0) && targetX < GUIMappings.GetLength(1))
+            { GUIMappings[targetY, targetX] = text[i]; }
+            else
+            { isOutOfBounds = true; }
         }
 
-        // reset
-        x -= text.Length;
+        // reset "pointer"
+        x = coords[0];
+        int newX = (int)Math.Floor((decimal)x / 2);
+        int newY = y;
 
-        if (border == 0) return;
-        for (int i = 0; i < (int)Math.Floor((decimal)text.Length/2); i++, x++)
+        // Map Out Background/Borders FIXME: move out the inline math operations
+        if (border == 1)
         {
-            ScreenMappings[y, x] = 0.50f;
+            for (int i = 0; i <= (int)Math.Floor((decimal)text.Length / 2); i++, newX++)
+            {
+                if (newX < ScreenMappings.GetLength(1))
+                { ScreenMappings[y, newX] = 0.50f; }
+                else
+                { isOutOfBounds = true; }
+            }
+        }
+        else if (border > 1)
+        {
+            for (int i = 0; i <= y + (border * 2); i++, newY++)
+            {
+                for (int j = 0; j <= ((int)Math.Floor((decimal)text.Length / 2) + (border * 2)); j++, newX++)
+                {
+                    if (newY < ScreenMappings.GetLength(0) && newX < ScreenMappings.GetLength(1))
+                    { ScreenMappings[newY, newX] = 0.50f; }
+                    else
+                    { isOutOfBounds = true; }
+                }
+            }
+        }
+
+        // Define the Out of Bounds Exception
+        if (isOutOfBounds)
+        {
+            try
+            { throw new IndexOutOfRangeException("A UI Component is out of bounds."); }
+            catch (Exception e)
+            { await HandleError(e); }
         }
     }
 
-    private static string GetPixelBrightness(float f)
-    {
-        byte step = (byte)Math.Floor(f / 1.0 * 255);
-        byte textColor = 97;
-        if (step > 128)
-        {
-            textColor = 30;
-        }
-
-        string brightness = $"\x1b[48;2;{step};{step};{step}m\x1b[{textColor}m";
-        return brightness;
-    }
     public void RenderFrame()
     {
         bool newLineLock = false;
@@ -188,30 +261,95 @@ internal class Screen
 
             // row
             for (int j = 0; j < width; j++)
-            {
-                frame.Append(RenderedFrame[i, j]);
-            }
+            { frame.Append(RenderedFrame[i, j]); }
         }
-        Console.WriteLine(frame.ToString());
+
+        Console.Write(frame.ToString());
     }
+
+    public void NextAction()
+    {
+        foreach (var action in ActionStore)
+        { action(); }
+    }
+
+    public void NextActionUp()
+    {
+        if (OverlayLockables[SelectedOverlay])
+        {
+            if (ActionIndex == 0) Log.Debug($"Selection Index: {ActionIndex}");
+            else { ActionIndex--; Log.Debug($"Selection Index: {ActionIndex}"); }
+            // link methods needed to render the indicated UI change
+        }
+        else
+        { Log.Debug("Warn: No Action Available"); }
+
+    }
+
+    public void NextActionDown()
+    {
+        if (OverlayLockables[SelectedOverlay])
+        {
+            if (ActionIndex == (ActionStore.Count - 1)) Log.Debug($"Selection Index: {ActionIndex}");
+            else { ActionIndex++; Log.Debug($"Selection Index: {ActionIndex}"); }
+            // link methods needed to render the indicated UI change
+        }
+        else
+        { Log.Debug("Warn: No Action Available"); }
+
+    }
+
+    public void NextActionLeft()
+    {
+        // Not Yet Implemented
+        Log.Debug("Warn: No Action Available");
+    }
+
+    public void NextActionRight()
+    {
+        // Not Yet Implemented
+        Log.Debug("Warn: No Action Available");
+    }
+
+    public void NextActionEnter()
+    {
+        // Execute available action
+        if (OverlayLockables[SelectedOverlay])
+        {
+            ActionStore[ActionIndex]();
+        }
+        else
+        { Log.Debug("Warn: No Action Available"); }
+    }
+
+
+
+
+
+    // Cleanup section
     public static void ClearFrame()
     {
-        // this just doesnt clear all the buffers so ya
         Console.Clear();
-
-        // idk any differences:
-        // Console.Write("\u001b[2J");
-
-        // Might not be supported on other console windows:
-        Console.Write("\x1b[3J");
+        Console.Write("\x1b[3J"); // alt
     }
 
-    private async Task HandleError(Exception e)
+    /// <summary>
+    /// Handle Errors with two different levels
+    /// </summary>
+    /// <param name="e"></param>
+    /// <param name="isMajor"></param>
+    /// <returns></returns>
+    private async Task HandleError(Exception e, bool isMajor = false)
     {
         if (Log == null) return;
+
         await Task.Run(() =>
         {
-            Log.Warn(e);
+            if (isMajor) Log.Warn(e.Message);
+            else Log.Info(e.Message);
+
+            if (e.StackTrace == null) return;
+            Log.Verbose(e);
         });
     }
 }
@@ -219,32 +357,105 @@ internal class Screen
 internal enum InterfaceTypes
 {
     TEXT,
+    DYNAMIC_TEXT,
+    MAGNETIC_TEXT,
     BUTTON,
+    SLIDER,
+    TEXT_INPUT
 }
 
 internal sealed class ScreenInterfaceBuilder
 {
+    /// <summary>
+    /// Component GUI Container
+    /// - Contains the type of component, and all essential data for rendering
+    /// </summary>
     private List<List<object>> ScreenGUI { get; set; }
 
     public ScreenInterfaceBuilder()
-    {
-        ScreenGUI = [];
-    }
+    { ScreenGUI = []; }
 
+    /// <summary>
+    /// Add a Text to the final GUI
+    /// </summary>
+    /// <param name="text"></param>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
     public ScreenInterfaceBuilder AddText(string text, int x, int y)
     {
         ScreenGUI.Add([InterfaceTypes.TEXT, text, new int[] { x, y }]);
         return this;
     }
-
-    public ScreenInterfaceBuilder AddButton(string text, int x, int y, int border = 0)
+    /// <summary>
+    /// Add a Text with alignment to the final GUI
+    /// </summary>
+    /// <param name="text"></param>
+    /// <param name="align"></param>
+    /// <returns></returns>
+    public ScreenInterfaceBuilder AddMagneticText(string text, string align)
     {
-        ScreenGUI.Add([InterfaceTypes.BUTTON, text, new int[] { x, y }, border]);
+        ScreenGUI.Add([InterfaceTypes.TEXT, text, align]);
+        return this;
+    }
+    /// <summary>
+    /// Add a Dynamic Text to the final GUI
+    /// - Dynamic Texts are texts that change over time
+    /// </summary>
+    /// <param name="text"></param>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
+    public ScreenInterfaceBuilder AddDynamicText(string text, int x, int y)
+    {
+        ScreenGUI.Add([InterfaceTypes.DYNAMIC_TEXT, text, new int[] { x, y }]);
+        return this;
+    }
+    /// <summary>
+    /// Add a Button to the final GUI
+    /// </summary>
+    /// <param name="text"></param>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <param name="onClick"></param>
+    /// <param name="border"></param>
+    /// <returns></returns>
+    public ScreenInterfaceBuilder AddButton(string text, int x, int y, Action onClick, int border = 0)
+    {
+        ScreenGUI.Add([InterfaceTypes.BUTTON, text, new int[] { x, y }, onClick, border]);
+        return this;
+    }
+    /// <summary>
+    /// Add a Slider control to the final GUI
+    /// </summary>
+    /// <param name="action"></param>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <param name="border"></param>
+    /// <returns></returns>
+    public ScreenInterfaceBuilder AddSlider(Action action, int x, int y, int border = 0)
+    {
+        ScreenGUI.Add([InterfaceTypes.SLIDER, action, new int[] { x, y }, border]);
+        return this;
+    }
+    /// <summary>
+    /// Add a User Text Input
+    /// </summary>
+    /// <param name="action"></param>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <param name="border"></param>
+    /// <returns></returns>
+    public ScreenInterfaceBuilder AddTextInput(Action action, int x, int y, int border = 0) // TODO: how do i do this
+    {
+        ScreenGUI.Add([InterfaceTypes.TEXT_INPUT, action, new int[] { x, y }, border]);
         return this;
     }
 
-    public List<List<object>> GetData()
-    {
-        return ScreenGUI;
-    }
+    /// <summary>
+    /// Export the GUI for rendering
+    /// </summary>
+    /// <returns></returns>
+    public List<List<object>> GetList()
+    { return ScreenGUI; }
 }

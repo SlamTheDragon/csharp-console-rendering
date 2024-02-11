@@ -9,7 +9,9 @@
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "requireExactSource": true
+            "requireExactSource": true,
+            "preLaunchTask": "dotnet: build",
+            "stopAtEntry": false
         },
         {
             "name": "[External] .NET Core Launch",
@@ -19,7 +21,9 @@
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "externalTerminal",
-            "requireExactSource": true
+            "requireExactSource": true,
+            "preLaunchTask": "dotnet: build",
+            "stopAtEntry": false
         }
     ]
 }

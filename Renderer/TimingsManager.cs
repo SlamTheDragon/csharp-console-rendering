@@ -1,23 +1,19 @@
-﻿using Utilities;
+﻿using Utilities.Data;
 
 namespace RenderEngine;
-
-internal sealed class RendererTimings : Configure
+public class RendererTimings
 {
     public int TickSpeed;
     public int FrameRate;
+    private SharedData? Data;
 
-    public RendererTimings()
-    {
-        Refresh();
-    }
+    public RendererTimings(SharedData data)
+    { Refresh(data); }
 
-    public void Refresh()
+    public void Refresh(SharedData data)
     {
-        if (Properties != null)
-        {
-            TickSpeed = Properties.Tick * 50;
-            FrameRate = 1000 / Properties.Refresh;
-        }
+        Data = data;
+        TickSpeed = Data.Properties.Tick * 50;
+        FrameRate = 1000 / Data.Properties.Refresh;
     }
 }

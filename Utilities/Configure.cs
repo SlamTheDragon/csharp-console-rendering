@@ -1,21 +1,24 @@
-﻿using System.Reflection;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
+using System.Reflection;
 
 namespace Utilities;
 
-// FIXME: Modify this class to only be called once, then make another class to be inherited as many times you want
-// see line 18 why
 public class Configure
 {
-    public static Properties? Properties { get; private set; }
-    private readonly JsonSerializerOptions _options = new() { WriteIndented = true };
-    private readonly bool _configLock = false;
-    private readonly string _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+    /// <summary>
+    /// Gets or sets the properties.
+    /// </summary>
+    public static Properties Properties { get; set; } = new();
 
+    private static readonly JsonSerializerOptions _options = new() { WriteIndented = true };
+    private static readonly string _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Configure"/> class.
+    /// </summary>
     protected Configure()
     {
-        if (_configLock) return;
         Properties configProperties = new();
 
         string defaultJson = JsonSerializer.Serialize(configProperties, _options);
@@ -32,10 +35,13 @@ public class Configure
         // Obtain configuration from file
         var file = File.ReadAllText(_configPath);
         Properties = JsonSerializer.Deserialize<Properties>(file);
-        _configLock = true;
     }
 
-    public void Save() {
+    /// <summary>
+    /// Saves the properties to the config file.
+    /// </summary>
+    public static void Save()
+    {
         // Serialize Latest Configs to Json
         string json = JsonSerializer.Serialize(Properties, _options);
 
@@ -54,7 +60,7 @@ public class Configure
 public sealed class Properties
 {
     /// <summary>
-    /// Json Version
+    /// Config Json Version
     /// </summary>
     public string Version { get; set; } = "1";
     /// <summary>
@@ -62,19 +68,19 @@ public sealed class Properties
     /// </summary>
     public string Release { get; set; }
     /// <summary>
-    /// Console Screen Refresh Speed
+    /// Terminal Screen Refresh Speed
     /// </summary>
     public int Refresh { get; set; } = 5;
     /// <summary>
-    /// Console Task Tick Speed (20 ticks = 1s)
+    /// Terminal Task Tick Speed (20 ticks = 1s)
     /// </summary>
-    public int Tick { get; set; } = 2;
+    public int Tick { get; set; } = 1;
     /// <summary>
-    /// A switch to enable file logging of debug
+    /// A flag to enable file logging of debug
     /// </summary>
     public bool IsDebug { get; set; } = false;
     /// <summary>
-    /// A switch to enable file logging of verbose
+    /// A flag to enable file logging of verbose
     /// </summary>
     public bool IsVerbose { get; set; } = false;
 
@@ -85,10 +91,7 @@ public sealed class Properties
 
         // Get the assembly information
         AssemblyName assemblyName = assembly.GetName();
-
-        if (assemblyName.Version == null) return;
-
-        // Access the version information
-        Release = assemblyName.Version.ToString();
+        if (assemblyName.Version == null) Release = "unknown";
+        else Release = assemblyName.Version.ToString();
     }
 }
