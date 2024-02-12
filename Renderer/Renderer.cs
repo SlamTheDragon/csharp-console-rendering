@@ -104,7 +104,12 @@ public class Renderer
                     .AddText("Sample Text Help", 0, 0);
         Menu = new ScreenInterfaceBuilder()
                     .AddText("Menu", 0, 0)
-                    .AddButton("Save & Exit", 0, 1, () => { _isExit = true; _rendererPauseEvent.Set(); }, 2);
+                    .AddButton(" 1 - Start Sandbox  ", 0, 1, () => { Log.Debug("Function Not Yet Implemented");}, 1)
+                    .AddButton(" 2 - Screen Test    ", 0, 2, () => { Log.Debug("Function Not Yet Implemented");}, 1)
+                    .AddButton(" 3 - Pointer Test   ", 0, 3, () => { Log.Debug("Function Not Yet Implemented");}, 1)
+                    .AddButton(" 4 - 3D Engine Test ", 0, 4, () => { Log.Debug("Function Not Yet Implemented");}, 1)
+                    .AddButton(" 5 - Save & Exit    ", 0, 6, () => { _isExit = true; _rendererPauseEvent.Set(); }, 1)
+                    ;
 
         // Build Screen
         await BuildScreen();

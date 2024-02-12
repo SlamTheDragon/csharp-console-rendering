@@ -21,13 +21,7 @@ internal static class Program
             .AddData(Data)
             .AddTimingsManager(Timings);
 
-        Log.Info("[==========================================]");
-        Log.Info("  Welcome to Slam's Fun Console Rendering");
-        Log.Info($"               Project {Data.Properties.Release}");
-        Log.Info("[==========================================]");
-
         await Renderer.Initialize();
-
         Cleanup(0);
     }
 

@@ -210,28 +210,31 @@ internal class Screen
 
         // reset "pointer"
         x = coords[0];
-        int newX = (int)Math.Floor((decimal)x / 2);
-        int newY = y;
 
         // Map Out Background/Borders FIXME: move out the inline math operations
         if (border == 1)
         {
+            int newX = (int)Math.Floor((decimal)x / 2);
             for (int i = 0; i <= (int)Math.Floor((decimal)text.Length / 2); i++, newX++)
             {
                 if (newX < ScreenMappings.GetLength(1))
-                { ScreenMappings[y, newX] = 0.50f; }
+                { ScreenMappings[y, newX] = 0.30f; }
                 else
                 { isOutOfBounds = true; }
             }
         }
         else if (border > 1)
         {
-            for (int i = 0; i <= y + (border * 2); i++, newY++)
+            // FIXME: this thing breaks with values above 2, your formula isnt right lol
+            int newY = y;
+            
+            for (int i = 0; i <= targetY; i++, newY++)
             {
-                for (int j = 0; j <= ((int)Math.Floor((decimal)text.Length / 2) + (border * 2)); j++, newX++)
+                int newX = (int)Math.Floor((decimal)x / 2);
+                for (int j = 0; j <= ((int)Math.Floor((decimal)text.Length / 2) + border); j++, newX++)
                 {
                     if (newY < ScreenMappings.GetLength(0) && newX < ScreenMappings.GetLength(1))
-                    { ScreenMappings[newY, newX] = 0.50f; }
+                    { ScreenMappings[newY, newX] = 0.30f; }
                     else
                     { isOutOfBounds = true; }
                 }
