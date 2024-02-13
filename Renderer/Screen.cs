@@ -13,12 +13,15 @@ internal class Screen
 
     public float[,] ScreenMappings { get; set; }
     private char[,] GUIMappings { get; set; }
-    private string[,] RenderedFrame { get; set; }
+    private string[,] RenderedFrame { get; set; } // can be char but would need it to be three dimensional
+
     private Dictionary<string, List<List<object>>> ScreenOverlayUI { get; set; } = [];
     private Dictionary<string, bool> OverlayLockables { get; set; } = [];
     private string SelectedOverlay { get; set; }
+
     private List<Action> ActionStore { get; set; } = [];
     private byte ActionIndex { get; set; }
+    private List<char> KeyStored { get; set; } = [];
     private Logger Log { get; set; }
     #endregion
 
@@ -142,7 +145,7 @@ internal class Screen
     {
         char[] text;
         int[] coords;
-        int border = 0;
+        int border;
 
         foreach (var row in ScreenOverlayUI[SelectOverlay])
         {
@@ -153,13 +156,38 @@ internal class Screen
                     text = ((string)row[1]).ToCharArray();
                     coords = (int[])row[2];
 
-                    await InterfaceBuilder(text, coords, border);
-                    break;
-
-                case InterfaceTypes.DYNAMIC_TEXT:
+                    await InterfaceBuilder(text, coords);
                     break;
 
                 case InterfaceTypes.MAGNETIC_TEXT:
+                    text = ((string)row[1]).ToCharArray();
+
+                    if ((AlignText)row[2] == AlignText.alignLeft)
+                    {
+                        coords = [0, (int)row[3]];
+                        await InterfaceBuilder(text, coords);
+                    }
+                    if ((AlignText)row[2] == AlignText.alignCenter)
+                    {
+                        int textLength = text.Length;
+                        int x = (width - textLength) / 2;
+                        coords = [x, (int)row[3]];
+                        await InterfaceBuilder(text, coords);
+                    }
+                    if ((AlignText)row[2] == AlignText.alignRight)
+                    {
+                        int textLength = text.Length;
+                        int x = width - textLength;
+                        coords = [x, (int)row[3]];
+                        await InterfaceBuilder(text, coords);
+                    }
+                    break;
+
+                case InterfaceTypes.DYNAMIC_TEXT:
+                    text = ((Func<string>)row[1])().ToCharArray();
+                    coords = (int[])row[2];
+
+                    await InterfaceBuilder(text, coords);
                     break;
 
                 case InterfaceTypes.BUTTON:
@@ -173,10 +201,26 @@ internal class Screen
                     await InterfaceBuilder(text, coords, border);
                     break;
 
+                case InterfaceTypes.DYNAMIC_BUTTON:
+                    text = ((Func<string>)row[1])().ToCharArray();
+                    coords = (int[])row[2];
+
+                    ActionStore.Add((Action)row[3]);
+
+                    border = (int)row[4];
+                    await InterfaceBuilder(text, coords, border);
+                    break;
+
                 case InterfaceTypes.SLIDER:
+                    // await InterfaceBuilder(text, coords, border);
                     break;
 
                 case InterfaceTypes.TEXT_INPUT:
+                    text = ((Func<char[]>)row[1])();
+
+                    coords = (int[])row[2];
+                    border = (int)row[3];
+                    await InterfaceBuilder(text, coords, border);
                     break;
             }
         }
@@ -227,7 +271,7 @@ internal class Screen
         {
             // FIXME: this thing breaks with values above 2, your formula isnt right lol
             int newY = y;
-            
+
             for (int i = 0; i <= targetY; i++, newY++)
             {
                 int newX = (int)Math.Floor((decimal)x / 2);
@@ -270,10 +314,97 @@ internal class Screen
         Console.Write(frame.ToString());
     }
 
-    public void NextAction()
+    public void NextKey(char keyInfo)
+    { KeyStored.Add(keyInfo); }
+
+    public void NextActionNum1()
     {
-        foreach (var action in ActionStore)
-        { action(); }
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionNum2()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionNum3()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionNum4()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionNum5()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionNum6()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionNum7()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionNum8()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionNum9()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionKeyW()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionKeyA()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionKeyS()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionKeyD()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionSpacebar()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
+    }
+
+    public void NextActionBackspace()
+    {
+        // Not Yet Implemented
+        Log.Debug("Info: No Action Available");
     }
 
     public void NextActionUp()
@@ -282,11 +413,11 @@ internal class Screen
         {
             if (ActionIndex == 0) Log.Debug($"Selection Index: {ActionIndex}");
             else { ActionIndex--; Log.Debug($"Selection Index: {ActionIndex}"); }
-            // link methods needed to render the indicated UI change
+            // link methods needed to render the indicated UI change into an action list to queue up for the next
+            // build frame call
         }
         else
-        { Log.Debug("Warn: No Action Available"); }
-
+        { Log.Debug("Info: No Action Available"); }
     }
 
     public void NextActionDown()
@@ -295,23 +426,23 @@ internal class Screen
         {
             if (ActionIndex == (ActionStore.Count - 1)) Log.Debug($"Selection Index: {ActionIndex}");
             else { ActionIndex++; Log.Debug($"Selection Index: {ActionIndex}"); }
-            // link methods needed to render the indicated UI change
+            // link methods needed to render the indicated UI change into an action list to queue up for the next
+            // build frame call
         }
         else
-        { Log.Debug("Warn: No Action Available"); }
-
+        { Log.Debug("Info: No Action Available"); }
     }
 
     public void NextActionLeft()
     {
         // Not Yet Implemented
-        Log.Debug("Warn: No Action Available");
+        Log.Debug("Info: No Action Available");
     }
 
     public void NextActionRight()
     {
         // Not Yet Implemented
-        Log.Debug("Warn: No Action Available");
+        Log.Debug("Info: No Action Available");
     }
 
     public void NextActionEnter()
@@ -322,10 +453,8 @@ internal class Screen
             ActionStore[ActionIndex]();
         }
         else
-        { Log.Debug("Warn: No Action Available"); }
+        { Log.Debug("Info: No Action Available"); }
     }
-
-
 
 
 
@@ -363,8 +492,16 @@ internal enum InterfaceTypes
     DYNAMIC_TEXT,
     MAGNETIC_TEXT,
     BUTTON,
+    DYNAMIC_BUTTON,
     SLIDER,
     TEXT_INPUT
+}
+
+internal enum AlignText
+{
+    alignLeft,
+    alignRight,
+    alignCenter
 }
 
 internal sealed class ScreenInterfaceBuilder
@@ -381,10 +518,10 @@ internal sealed class ScreenInterfaceBuilder
     /// <summary>
     /// Add a Text to the final GUI
     /// </summary>
-    /// <param name="text"></param>
-    /// <param name="x"></param>
-    /// <param name="y"></param>
-    /// <returns></returns>
+    /// <param name="text">The text to be added</param>
+    /// <param name="x">The x-coordinate of the text</param>
+    /// <param name="y">The y-coordinate of the text</param>
+    /// <returns>The ScreenInterfaceBuilder instance</returns>
     public ScreenInterfaceBuilder AddText(string text, int x, int y)
     {
         ScreenGUI.Add([InterfaceTypes.TEXT, text, new int[] { x, y }]);
@@ -393,52 +530,67 @@ internal sealed class ScreenInterfaceBuilder
     /// <summary>
     /// Add a Text with alignment to the final GUI
     /// </summary>
-    /// <param name="text"></param>
-    /// <param name="align"></param>
-    /// <returns></returns>
-    public ScreenInterfaceBuilder AddMagneticText(string text, string align)
+    /// <param name="text">The text to be added</param>
+    /// <param name="alignText">The alignment of the text (alignLeft, alignRight, alignCenter)</param>
+    /// <returns>The ScreenInterfaceBuilder instance</returns>
+    public ScreenInterfaceBuilder AddMagneticText(string text, AlignText alignText, int y)
     {
-        ScreenGUI.Add([InterfaceTypes.TEXT, text, align]);
+        ScreenGUI.Add([InterfaceTypes.TEXT, text, alignText, y]);
         return this;
     }
     /// <summary>
     /// Add a Dynamic Text to the final GUI
     /// - Dynamic Texts are texts that change over time
     /// </summary>
-    /// <param name="text"></param>
-    /// <param name="x"></param>
-    /// <param name="y"></param>
-    /// <returns></returns>
-    public ScreenInterfaceBuilder AddDynamicText(string text, int x, int y)
+    /// <param name="textMethod">The method that generates the dynamic text</param>
+    /// <param name="x">The x-coordinate of the text</param>
+    /// <param name="y">The y-coordinate of the text</param>
+    /// <returns>The ScreenInterfaceBuilder instance</returns>
+    public ScreenInterfaceBuilder AddDynamicText(Func<string> textMethod, int x, int y)
     {
-        ScreenGUI.Add([InterfaceTypes.DYNAMIC_TEXT, text, new int[] { x, y }]);
+        ScreenGUI.Add([InterfaceTypes.DYNAMIC_TEXT, textMethod, new int[] { x, y }]);
         return this;
     }
     /// <summary>
     /// Add a Button to the final GUI
     /// </summary>
-    /// <param name="text"></param>
-    /// <param name="x"></param>
-    /// <param name="y"></param>
-    /// <param name="onClick"></param>
-    /// <param name="border"></param>
-    /// <returns></returns>
-    public ScreenInterfaceBuilder AddButton(string text, int x, int y, Action onClick, int border = 0)
+    /// <param name="text">The text of the button</param>
+    /// <param name="x">The x-coordinate of the button</param>
+    /// <param name="y">The y-coordinate of the button</param>
+    /// <param name="onInput">The action to be executed when the button is pressed</param>
+    /// <param name="border">The border size of the button</param>
+    /// <returns>The ScreenInterfaceBuilder instance</returns>
+    public ScreenInterfaceBuilder AddButton(string text, int x, int y, Action onInput, int border = 0)
     {
-        ScreenGUI.Add([InterfaceTypes.BUTTON, text, new int[] { x, y }, onClick, border]);
+        ScreenGUI.Add([InterfaceTypes.BUTTON, text, new int[] { x, y }, onInput, border]);
+        return this;
+    }
+    /// <summary>
+    /// Add a Dynamic Button to the final GUI
+    /// </summary>
+    /// <param name="textMethod">The method that generates the dynamic text of the button</param>
+    /// <param name="x">The x-coordinate of the button</param>
+    /// <param name="y">The y-coordinate of the button</param>
+    /// <param name="onInput">The action to be executed when the button is pressed</param>
+    /// <param name="border">The border size of the button</param>
+    /// <returns>The ScreenInterfaceBuilder instance</returns>
+    public ScreenInterfaceBuilder AddDynamicButton(Func<string> textMethod, int x, int y, Action onInput, int border = 0)
+    {
+        ScreenGUI.Add([InterfaceTypes.DYNAMIC_BUTTON, textMethod, new int[] { x, y }, onInput, border]);
         return this;
     }
     /// <summary>
     /// Add a Slider control to the final GUI
     /// </summary>
-    /// <param name="action"></param>
-    /// <param name="x"></param>
-    /// <param name="y"></param>
-    /// <param name="border"></param>
-    /// <returns></returns>
-    public ScreenInterfaceBuilder AddSlider(Action action, int x, int y, int border = 0)
+    /// <param name="action">The action to be executed when the slider value changes</param>
+    /// <param name="x">The x-coordinate of the slider</param>
+    /// <param name="y">The y-coordinate of the slider</param>
+    /// <param name="onInput">The action to be executed when the slider is interacted with</param>
+    /// <param name="border">The border size of the slider</param>
+    /// <returns>The ScreenInterfaceBuilder instance</returns>
+    public ScreenInterfaceBuilder AddSlider(Action action, int x, int y, Action onInput, int border = 0)
     {
-        ScreenGUI.Add([InterfaceTypes.SLIDER, action, new int[] { x, y }, border]);
+        ScreenGUI.Add([InterfaceTypes.SLIDER, action, new int[] { x, y }, onInput, border]);
         return this;
     }
     /// <summary>
@@ -449,16 +601,15 @@ internal sealed class ScreenInterfaceBuilder
     /// <param name="y"></param>
     /// <param name="border"></param>
     /// <returns></returns>
-    public ScreenInterfaceBuilder AddTextInput(Action action, int x, int y, int border = 0) // TODO: how do i do this
+    public ScreenInterfaceBuilder AddTextInput(Func<char[]> textMethod, int x, int y, int border = 0)
     {
-        ScreenGUI.Add([InterfaceTypes.TEXT_INPUT, action, new int[] { x, y }, border]);
+        ScreenGUI.Add([InterfaceTypes.TEXT_INPUT, textMethod, new int[] { x, y }, border]);
         return this;
     }
-
     /// <summary>
     /// Export the GUI for rendering
     /// </summary>
-    /// <returns></returns>
+    /// <returns>The GUI as a list of lists of objects</returns>
     public List<List<object>> GetList()
     { return ScreenGUI; }
 }

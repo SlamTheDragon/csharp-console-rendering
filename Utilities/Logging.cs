@@ -172,9 +172,7 @@ public sealed class LogStreamer
                 }
             }
             catch (Exception e)
-            {
-                _ = e;
-            }
+            { _ = e; }
             dupe++;
         }
     }

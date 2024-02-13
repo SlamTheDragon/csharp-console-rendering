@@ -23,11 +23,11 @@
     - A string containing the current overlay that is being rendered
 
 ## FIXME's
-- [ ] Actually redefine the rendering flow. This is to account proper handling/rebuilding of GUI's
+- [X] Actually redefine the rendering flow. This is to account proper handling/rebuilding of GUI's
 
 ## Optimization
 - [X] Define Screen.cs's frame rendering flow across rendering methods.
-- [ ] Possibly integrate a rendering method in Screen.BuildFrame().
+- [ ] Possibly integrate a rendering method in Screen.BuildFrame(). (!!PLANNED > queuing methods)
 
 ## Refactoring
 - [X] Fix Program.cs
@@ -36,9 +36,9 @@
   - [!!] Now properly implement the renderer methods to accurately display information.
 
 - [X] Separate the file streaming from the Logging.cs's constructor. Share one streamwriter logging instance across classes.
-- [!!] Replace/Remove RendererType enum.
+- [X] Replace/Remove RendererType enum.
     - [/] Refactor rendering methods hierarchy.
-- [!!] Fix Renderer.cs's threading to properly use System.Threading (also to allow us to watch volatile properties without worrying about thread safety) 
+- [X] Fix Renderer.cs's threading to properly use System.Threading (also to allow us to watch volatile properties without worrying about thread safety) (apparently the design is fine)
 - [x] Properly implement Renderer.cs constructor.
 - [ ] Merge methods that can be merged (!PARTIAL)
 
