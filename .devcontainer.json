@@ -1,5 +1,5 @@
 {
-    "name": ".NET with Aspire",
+    "name": ".NET in Codespaces",
     "image": "mcr.microsoft.com/dotnet/sdk:8.0",
     "features": {
         "ghcr.io/devcontainers/features/docker-in-docker:2": {},
@@ -22,10 +22,36 @@
     "customizations": {
         "vscode": {
             "extensions": [
+                "ms-vscode.vscode-node-azure-pack",
+                "GitHub.copilot",
+                "GitHub.vscode-github-actions",
                 "ms-dotnettools.vscode-dotnet-runtime",
-                "ms-dotnettools.csdevkit"
+                "ms-dotnettools.csdevkit",
+                "ms-dotnetools.csharp"
             ]
         }
     },
-    "postCreateCommand": "dotnet workload update && dotnet workload install aspire && dotnet restore"
+    "forwardPorts": [
+        8080,
+        8081
+    ],
+    "postCreateCommand": "cd ./SampleApp && dotnet restore",
+    "hostRequirements": {
+        "memory": "8gb",
+        "cpus": 4
+    },
+    "remoteEnv": {
+        "DOTNET_MULTILEVEL_LOOKUP": "0",
+        "TARGET": "net8.0"
+    },
+    "portsAttributes": {
+        "8080": {
+            "label": "Weather API",
+            "onAutoForward": "notify"
+        },
+        "8081": {
+            "label": "Weather Front End",
+            "onAutoForward": "notify"
+        }
+    }
 }
